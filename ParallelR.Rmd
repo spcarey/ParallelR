@@ -1,0 +1,116 @@
+---
+title: "Parallel ML in R"
+author: "SFC Sean Carey"
+date: "1/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(randomForest)
+library(parallel)
+library(microbenchmark)
+
+```
+
+## Overview
+
+This tutorial will give an example of how to parallel the code for running a Random Forrest Regression using the "parallel" and "randomForest" packages. A comparison between the parallel code and the regular code will be made using the "microbenchmark" package. My purpose in this exercise was not any sort of predictive accuracly of the model but the use of the Zillow API and  the parallel package.   Other tutorials about how and why to parallel different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
+
+
+
+## The Data
+
+   The data for this  was originally retrieved by taking a ramdom sapmple of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function. Any addresses that zillow did not return were written as missing values and subequently dropped from the final dataset. 
+
+```{r The Data}
+
+# read in the data from my github
+MODEL_FULL <- read_csv("https://raw.githubusercontent.com/spcarey/ZillowR_and_Parallel/master/ZILLOW_DATA.csv")
+MODEL_FULL$Use_Code <- as.factor(MODEL_FULL$Use_Code)
+
+# split the data set into testing and training 
+
+TRAIN <- sample(1:nrow(MODEL_FULL), size = nrow(MODEL_FULL)*0.8)
+TEST <- dplyr::setdiff(1:nrow(MODEL_FULL), TRAIN)
+
+#create training and test data sets
+MODEL_TRAIN <-  MODEL_FULL[TRAIN, ]
+MODEL_TEST <- MODEL_FULL[TEST, ]
+
+
+```
+
+## Random Forest 
+
+```{r pressure, echo=FALSE}
+S_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = (ncol(MODEL_TRAIN) - 1)/3, ntree = 3000, importance = TRUE)
+
+#Predict using Test set
+S_PRED <- predict(S_FIT, newdata = dplyr::select(MODEL_TEST, -zestimate))
+
+#compute RMSE
+S_RMSE <- sqrt(mean((S_PRED - MODEL_TEST$zestimate )^2))
+
+S_RMSE
+```
+
+## Parallel Random Forrest
+
+```{r}
+#detect number of cores on machine
+cores <- detectCores()
+#create cluster
+cluster <- makeCluster(cores - 1)
+
+#create parallel function that will be run in parLapply
+parallel.function <- function(i){ randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = (ncol(MODEL_TRAIN) - 1)/3, 
+											 ntree = i, importance = TRUE)}
+#Export the dataset to the cluster.
+clusterExport(cluster,c('MODEL_TRAIN'))
+
+#run the parallel function 1000 times on each  of the 3 available cores.
+results <- parLapply(cluster,X=c(1000,1000,1000),fun = parallel.function)
+
+stopCluster(cluster)
+
+#Predict using each of the three saved fits
+PRED1 <- predict(results[[1]], newdata = dplyr::select(MODEL_TEST, -zestimate))
+PRED2 <- predict(results[[2]], newdata = dplyr::select(MODEL_TEST, -zestimate))
+PRED3 <- predict(results[[3]], newdata = dplyr::select(MODEL_TEST, -zestimate))
+
+#Average the predictions of the three returned fits. 
+PREDC <- (PRED1+PRED2+PRED3)/3
+
+#compute the RMSE of the Parallelized version of the model
+P_RMSE <- sqrt(mean((PREDC - MODEL_TEST$zestimate )^2))
+```
+
+## Benchmark the Performance of each side by side
+```{r}
+S_TIME <- microbenchmark({
+S_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, 
+											 ntree = 3000, importance = TRUE)
+}, times = 10, unit = "s")
+
+
+#benchmark Parallel fit model
+P_TIME <- microbenchmark({ cluster <- makeCluster(cores - 1)
+
+parallel.function <- function(i){ randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, 
+											 ntree = i, importance = TRUE)}
+
+clusterExport(cluster,c('MODEL_TRAIN'))
+
+results <- parLapply(cluster,X=c(1000,1000,1000),fun = parallel.function)
+
+stopCluster(cluster)  
+}, times = 10, unit = "s")
+
+Mean_S_TIME <- mean(S_TIME$time)/1000000000
+Mean_P_TIME <- mean(P_TIME$time)/1000000000
+```
+
+
