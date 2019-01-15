@@ -1,8 +1,8 @@
 ---
-title: "Parallel ML in R"
+title: "Parallel Random Forest in R"
 author: "SFC Sean Carey"
 date: "1/10/2019"
-output: html_document
+output: dscoemarkdown::dscoe
 ---
 
 ```{r setup, include=FALSE}
@@ -12,68 +12,89 @@ library(tidyverse)
 library(randomForest)
 library(parallel)
 library(microbenchmark)
+require(dscoemarkdown)
+library(knitr)
+
+set.seed(12580)
+
 
 ```
 
 ## Overview
 
-This tutorial will give an example of how to parallel the code for running a Random Forrest Regression using the "parallel" and "randomForest" packages. A comparison between the parallel code and the regular code will be made using the "microbenchmark" package. My purpose in this exercise was not any sort of predictive accuracly of the model but the use of the Zillow API and  the parallel package.   Other tutorials about how and why to parallel different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
+This tutorial will give an example of how to parallelize the code for running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code will be made using the "microbenchmark" package. My purpose in this exercise was not any sort of predictive accuracy of the model but to demonstrate this particular use case for the "Parallel" package.   Other tutorials about how and why to use code parallelization for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
 
 
 
 ## The Data
 
-   The data for this  was originally retrieved by taking a ramdom sapmple of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function. Any addresses that zillow did not return were written as missing values and subequently dropped from the final dataset. 
+   The data for this  was originally retrieved by taking a random sample of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function. Any addresses that zillow did not return were written as missing values and subsequently dropped from the final data-set. 
+   
+   For this exercise the data is read in and split into Training and Test data-sets. 
 
-```{r The Data}
+```{r The Data, message=FALSE, warning=FALSE}
 
 # read in the data from my github
 MODEL_FULL <- read_csv("https://raw.githubusercontent.com/spcarey/ZillowR_and_Parallel/master/ZILLOW_DATA.csv")
+
+
+#change "Use_Code" to a factor
 MODEL_FULL$Use_Code <- as.factor(MODEL_FULL$Use_Code)
+
 
 # split the data set into testing and training 
 
 TRAIN <- sample(1:nrow(MODEL_FULL), size = nrow(MODEL_FULL)*0.8)
 TEST <- dplyr::setdiff(1:nrow(MODEL_FULL), TRAIN)
 
-#create training and test data sets
+
 MODEL_TRAIN <-  MODEL_FULL[TRAIN, ]
 MODEL_TEST <- MODEL_FULL[TEST, ]
+
+glimpse(MODEL_FULL)
 
 
 ```
 
 ## Random Forest 
 
-```{r pressure, echo=FALSE}
-S_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = (ncol(MODEL_TRAIN) - 1)/3, ntree = 3000, importance = TRUE)
+  This demonstrates running a normal Random Forest with ntree = 9000
+
+```{r S_RF}
+NORM_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = (ncol(MODEL_TRAIN) - 1)/3, ntree = 9000)
 
 #Predict using Test set
-S_PRED <- predict(S_FIT, newdata = dplyr::select(MODEL_TEST, -zestimate))
+NORM_PRED <- predict(NORM_FIT, newdata = dplyr::select(MODEL_TEST, -zestimate))
 
 #compute RMSE
-S_RMSE <- sqrt(mean((S_PRED - MODEL_TEST$zestimate )^2))
+NORM_RMSE <- sqrt(mean((NORM_PRED - MODEL_TEST$zestimate )^2))
 
-S_RMSE
+
 ```
 
-## Parallel Random Forrest
+### Parallel Random Forest
 
-```{r}
+ The Random Forest algorithm is a good candidate for parallel computing as the re-sampling has no requirement to be done sequentially. If your computer has multiple cores the re-sampling work can been split equally between them. The Random Forest above was fit with 9000 trees sequentially. Using the parallel package this this can be split up equally between the available cores. 
+
+
+```{r P_RF}
 #detect number of cores on machine
 cores <- detectCores()
-#create cluster
+
+#create cluster with one less core than your machine has.
 cluster <- makeCluster(cores - 1)
 
-#create parallel function that will be run in parLapply
+#create parallel function that will be run in parLapply. 
+
 parallel.function <- function(i){ randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = (ncol(MODEL_TRAIN) - 1)/3, 
-											 ntree = i, importance = TRUE)}
+											 ntree = i)}
 #Export the dataset to the cluster.
 clusterExport(cluster,c('MODEL_TRAIN'))
 
-#run the parallel function 1000 times on each  of the 3 available cores.
-results <- parLapply(cluster,X=c(1000,1000,1000),fun = parallel.function)
+#run the parallel function 3000 times on each  of the 3 available cores.
+results <- parLapply(cluster,X=c(3000,3000,3000),fun = parallel.function)
 
+#stop the cluster
 stopCluster(cluster)
 
 #Predict using each of the three saved fits
@@ -81,36 +102,57 @@ PRED1 <- predict(results[[1]], newdata = dplyr::select(MODEL_TEST, -zestimate))
 PRED2 <- predict(results[[2]], newdata = dplyr::select(MODEL_TEST, -zestimate))
 PRED3 <- predict(results[[3]], newdata = dplyr::select(MODEL_TEST, -zestimate))
 
-#Average the predictions of the three returned fits. 
-PREDC <- (PRED1+PRED2+PRED3)/3
+#Average the predictions of the three returned fits by taking the rowMeans()
+PREDC <- cbind(PRED1,PRED2,PRED3) %>% rowMeans()
+
 
 #compute the RMSE of the Parallelized version of the model
 P_RMSE <- sqrt(mean((PREDC - MODEL_TEST$zestimate )^2))
 ```
 
-## Benchmark the Performance of each side by side
-```{r}
-S_TIME <- microbenchmark({
-S_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, 
-											 ntree = 3000, importance = TRUE)
+## Benchmark the Performance of each side by side  
+
+
+```{r benchmark}
+NORM_TIME <- microbenchmark({
+NORM_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, 
+											 ntree = 9000, importance = TRUE)
 }, times = 10, unit = "s")
 
 
 #benchmark Parallel fit model
-P_TIME <- microbenchmark({ cluster <- makeCluster(cores - 1)
+PAR_TIME <- microbenchmark({ cluster <- makeCluster(cores - 1)
 
-parallel.function <- function(i){ randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, 
-											 ntree = i, importance = TRUE)}
+parallel.function <- function(i){ 
+   randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, ntree = i, importance = TRUE)
+   }
 
 clusterExport(cluster,c('MODEL_TRAIN'))
 
-results <- parLapply(cluster,X=c(1000,1000,1000),fun = parallel.function)
+results <- parLapply(cluster,X=c(3000,3000,3000),fun = parallel.function)
 
 stopCluster(cluster)  
 }, times = 10, unit = "s")
 
-Mean_S_TIME <- mean(S_TIME$time)/1000000000
-Mean_P_TIME <- mean(P_TIME$time)/1000000000
+MEAN_TIME_NORM <- mean(NORM_TIME$time)/1000000000
+MEAN_TIME_PAR <- mean(PAR_TIME$time)/1000000000
+```
+## Comparison of Results and Performance  
+
+The results from the two models are roughly the same. However, you will notice that the parallel fit version of the model has about a 50% faster run-time than the sequentially fit model. 
+
+```{r result}
+Parallel_Fit<- c(P_RMSE, MEAN_TIME_PAR)
+
+Sequential_Fit <- c(NORM_RMSE, MEAN_TIME_NORM)
+
+RESULTS_DF <- rbind(Parallel_Fit, Sequential_Fit)
+
+results_table <- kable(RESULTS_DF,row.names = TRUE,col.names = c("Model RMSE","Run Time Seconds"))
+
+results_table
 ```
 
+## Conclusion  
 
+ 
