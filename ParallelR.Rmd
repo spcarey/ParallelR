@@ -22,24 +22,26 @@ set.seed(12580)
 
 ## Overview
 
-This tutorial will give an example of how to parallelize the code for running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code will be made using the "microbenchmark" package. My purpose in this exercise was not any sort of predictive accuracy of the model but to demonstrate this particular use case for the "Parallel" package.   Other tutorials about how and why to use code parallelization for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
+This tutorial will give an example of how use parallel computing to speed  the running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code will be made using the "microbenchmark" package. My purpose in this exercise is not the  predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use code parallel computing for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
 
 
 
 ## The Data
 
-   The data for this  was originally retrieved by taking a random sample of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function. Any addresses that zillow did not return were written as missing values and subsequently dropped from the final data-set. 
+   The data for this  was originally retrieved by taking a random sample of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function.  Any addresses that zillow did not return were written as missing values and subsequently dropped from the final data-set. 
    
    For this exercise the data is read in and split into Training and Test data-sets. 
 
 ```{r The Data, message=FALSE, warning=FALSE}
 
 # read in the data from my github
-MODEL_FULL <- read_csv("https://raw.githubusercontent.com/spcarey/ZillowR_and_Parallel/master/ZILLOW_DATA.csv")
+MODEL_FULL <- read_csv("https://raw.githubusercontent.com/spcarey/ParallelR/master/MODEL_FULL.csv")
 
 
-#change "Use_Code" to a factor
+
+#change "Use_Code" to a categorical variable
 MODEL_FULL$Use_Code <- as.factor(MODEL_FULL$Use_Code)
+
 
 
 # split the data set into testing and training 
@@ -74,7 +76,7 @@ NORM_RMSE <- sqrt(mean((NORM_PRED - MODEL_TEST$zestimate )^2))
 
 ### Parallel Random Forest
 
- The Random Forest algorithm is a good candidate for parallel computing as the re-sampling has no requirement to be done sequentially. If your computer has multiple cores the re-sampling work can been split equally between them. The Random Forest above was fit with 9000 trees sequentially. Using the parallel package this this can be split up equally between the available cores. 
+ The Random Forest algorithm is a good candidate for parallel computing as the re-sampling has no requirement to be done sequentially. If your computer has multiple cores the re-sampling work can been split using the "Parallel" package. The Random Forest above was fit with 9000 trees sequentially. Using the parallel package this this can be split up equally between the available cores. 
 
 
 ```{r P_RF}
@@ -111,13 +113,14 @@ P_RMSE <- sqrt(mean((PREDC - MODEL_TEST$zestimate )^2))
 ```
 
 ## Benchmark the Performance of each side by side  
-
+ 
+  Use the microbenchmark package to get the system run time of the sequentially  and parallel fit models
 
 ```{r benchmark}
 NORM_TIME <- microbenchmark({
 NORM_FIT <- randomForest::randomForest(zestimate ~ ., data = MODEL_TRAIN, mtry = ncol(MODEL_TRAIN) - 1, 
 											 ntree = 9000, importance = TRUE)
-}, times = 10, unit = "s")
+}, times = 1, unit = "s")
 
 
 #benchmark Parallel fit model
@@ -132,14 +135,14 @@ clusterExport(cluster,c('MODEL_TRAIN'))
 results <- parLapply(cluster,X=c(3000,3000,3000),fun = parallel.function)
 
 stopCluster(cluster)  
-}, times = 10, unit = "s")
+}, times = 1, unit = "s")
 
 MEAN_TIME_NORM <- mean(NORM_TIME$time)/1000000000
 MEAN_TIME_PAR <- mean(PAR_TIME$time)/1000000000
 ```
 ## Comparison of Results and Performance  
 
-The results from the two models are roughly the same. However, you will notice that the parallel fit version of the model has about a 50% faster run-time than the sequentially fit model. 
+The results from the two models are roughly the same except the parallel fit version has about a 50% faster run-time than the sequentially fit model. 
 
 ```{r result}
 Parallel_Fit<- c(P_RMSE, MEAN_TIME_PAR)
@@ -155,4 +158,4 @@ results_table
 
 ## Conclusion  
 
- 
+ You should consider parallel computing if you find any time consuming tasks where multiple iterations are performed and there is zero dependency between iterations.  Other methods of doing this same task with other packages exist. I like using this method for an example because it makes you show all of the steps of detecting the number of cores, setting up your cluster, running the model and combining the results. It is also platform independent so it can be run no matter what computing platform you prefer. All code for this example can be found on my GitHub: https://github.com/spcarey/ParallelR
