@@ -1,7 +1,7 @@
 ---
-title: "Parallel Random Forest in R"
+title: " Random Forest using Parallel Computing in R"
 author: "SFC Sean Carey"
-date: "1/10/2019"
+date: "1/15/2019"
 output: dscoemarkdown::dscoe
 ---
 
