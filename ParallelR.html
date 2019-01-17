@@ -131,7 +131,7 @@ $(document).ready(function () {
 
 <div id="overview" class="section level2">
 <h2>Overview</h2>
-<p>This tutorial will gives an example of how to use parallel computing to speed the running a Random Forrest Regression using the “parallel” and “randomForest” packages in R. A comparison between the parallel code and the regular code is made using the “microbenchmark” package. My purpose in this exercise is not the predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use code parallel computing for different tasks in R can be found at: <a href="https://52.61.179.13/post/329/" class="uri">https://52.61.179.13/post/329/</a> and <a href="https://52.61.179.13/post/356/" class="uri">https://52.61.179.13/post/356/</a></p>
+<p>This tutorial gives an example of how to use parallel computing to speed the running a Random Forrest Regression using the “parallel” and “randomForest” packages in R. A comparison between the parallel code and the regular code is made using the “microbenchmark” package. My purpose in this exercise is not the predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use code parallel computing for different tasks in R can be found at: <a href="https://52.61.179.13/post/329/" class="uri">https://52.61.179.13/post/329/</a> and <a href="https://52.61.179.13/post/356/" class="uri">https://52.61.179.13/post/356/</a></p>
 </div>
 <div id="the-data" class="section level2">
 <h2>The Data</h2>
@@ -262,13 +262,13 @@ results_table</code></pre>
 <tbody>
 <tr class="odd">
 <td>Parallel_Fit</td>
-<td align="right">493537.1</td>
-<td align="right">35.87065</td>
+<td align="right">492487.8</td>
+<td align="right">28.59795</td>
 </tr>
 <tr class="even">
 <td>Sequential_Fit</td>
 <td align="right">493893.7</td>
-<td align="right">75.91090</td>
+<td align="right">61.90583</td>
 </tr>
 </tbody>
 </table>

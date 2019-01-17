@@ -22,7 +22,7 @@ set.seed(12580)
 
 ## Overview
 
-This tutorial will gives an example of how to use parallel computing to speed  the running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code is made using the "microbenchmark" package. My purpose in this exercise is not the  predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use code parallel computing for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
+This tutorial gives an example of how to use parallel computing to speed  the running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code is made using the "microbenchmark" package. My purpose in this exercise is not the  predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use code parallel computing for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
 
 
 

@@ -22,13 +22,13 @@ set.seed(12580)
 
 ## Overview
 
-This tutorial will gives an example of how to use parallel computing to speed  the running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code is made using the "microbenchmark" package. My purpose in this exercise is not the  predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use code parallel computing for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
+This tutorial gives an example of how to use parallel computing to speed the running a Random Forrest Regression using the "parallel" and "randomForest" packages in R. A comparison between the parallel code and the regular code is made using the "microbenchmark" package. My purpose in this exercise is not the predictive accuracy of the model but to demonstrate this use case of parallel computing. Other tutorials about how and why to use parallel computing for different tasks in R can be found at: https://52.61.179.13/post/329/   and   https://52.61.179.13/post/356/ 
 
 
 
 ## The Data
 
-   The data for this  was originally retrieved by taking a random sample of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function.  Any addresses that zillow did not return were written as missing values and subsequently dropped from the final data-set. 
+   The data for this was originally retrieved by taking a random sample of 4000 addresses in Los Angeles and querying them with the Zillow API from the "zillowR" package. The data was returned, cleaned and saved into a data frame using a custom function.  Any addresses that zillow did not return were written as missing values and subsequently dropped from the final data-set. 
    
    For this exercise the data is read in and split into Training and Test data-sets. 
 
